@@ -10,17 +10,18 @@ conf.set('spark.jars.packages', 'org.apache.hadoop:hadoop-aws:3.1.2,net.snowflak
 conf.set('fs.s3a.aws.credentials.provider', 'com.amazonaws.auth.DefaultAWSCredentialsProviderChain')
 conf.set('fs.s3a.impl', 'org.apache.hadoop.fs.s3a.S3AFileSystem')
 
+nested_cols = {'coordinates' : ['latitude', 'longitude'], 'date' : ['local', 'utc']}
 
+spark = (SparkSession
+        .builder
+        .config(conf=conf)
+        .getOrCreate())
 
-if __name__ == '__main__':
-    spark = (SparkSession
-                .builder
-                .config(conf=conf)
-                .getOrCreate())
+df = spark.read.json(weather_data)
 
-    weather_df = spark.read.json(weather_data)
-    weather_df.show()
-    weather_df.printSchema()
-
+df.select('*', df[].alias('latitude'), df['coordinates.longitude'].alias('longitude'), df['date.local'].alias(('local'), df['date.utc'].alias('utc')).collect()
+df.printSchema()
+#df.drop('coordinates').collect()
+#df.drop('date').collect()
     
     
