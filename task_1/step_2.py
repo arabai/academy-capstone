@@ -12,6 +12,6 @@ def get_secrets():
     return response
 
 
-if __name__ == '__main__':
-    pp = pprint.PrettyPrinter(indent=4)
-    pp.pprint(get_secrets())
+#if __name__ == '__main__':
+#    pp = pprint.PrettyPrinter(indent=4)
+#    pp.pprint(get_secrets())
