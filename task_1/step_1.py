@@ -42,7 +42,7 @@ def flatten_and_drop_nested_cols(df, nested_cols, other_cols):
 
 def cast_col_to_timestamp(df, cols):
         for col in cols:
-                df.withColumn(col, psf.to_timestamp("local", "yyyy-MM-dd'T'HH:mm:ss+S"))
+                df = df.withColumn(col, psf.to_timestamp(col, "yyyy-MM-dd'T'HH:mm:ssXXX"))
         return df
 
 def write_to_snowflake(df):
