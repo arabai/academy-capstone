@@ -1,8 +1,9 @@
 import pyspark
 from pyspark.sql import SparkSession
 from pyspark import SparkConf
-#from pyspark.sql import functions as psf
-
+from pyspark.sql import functions as psf
+from step_2 import get_secrets
+import json
 
 weather_data_part_1 = 's3a://dataminded-academy-capstone-resources/raw/open_aq/data_part_1.json'
 complete_weather_data = 's3a://dataminded-academy-capstone-resources/raw/open_aq'
@@ -26,7 +27,7 @@ def retrieve_and_return_nested_cols(cols):
         nested_cols = []
         other_cols = []
         for column in cols:
-                if column[1] == 'struct':
+                if 'struct' in column[1] :
                         nested_cols.append(column[0])
                 else:
                         other_cols.append(column[0])
@@ -34,14 +35,40 @@ def retrieve_and_return_nested_cols(cols):
 
 
 def flatten_and_drop_nested_cols(df, nested_cols, other_cols):
-        new_list = []
-        for cols in other_cols:
-                new_list.append(cols)
-        for n_cols in nested_cols:
-                new_list.append(n_cols)
-        flattened_df = df.select(*new_list)
+        flattened_df = df.select(*other_cols, *[c + ".*" for c in nested_cols])
         cleaned_df = flattened_df.drop(*nested_cols)
         return cleaned_df
+
+
+def cast_col_to_timestamp(df, cols):
+        for col in cols:
+                df.withColumn(col, psf.to_timestamp("local", "yyyy-MM-dd'T'HH:mm:ss+S"))
+        return df
+
+def write_to_snowflake(df):
+    credentials = get_secrets()
+    secret_string = credentials["SecretString"]
+
+    secrets = json.loads(secret_string)
+
+    SNOWFLAKE_SOURCE_NAME = "net.snowflake.spark.snowflake"
+
+    sfOptions = {
+        "sfURL" : secrets["URL"] + ".snowflakecomputing.com",
+        "sfUser" : secrets["USER_NAME"],
+        "sfPassword": secrets["PASSWORD"],
+        "sfRole": secrets["ROLE"],
+        "sfDatabase" : secrets["DATABASE"],
+        "sfSchema" : "ANAS",
+        "sfWarehouse" : secrets["WAREHOUSE"]
+    }
+
+    (df.write
+        .format(SNOWFLAKE_SOURCE_NAME)
+        .options(**sfOptions)
+        .option("dbtable", "ANAS")
+        .mode("overwrite")
+        .save())
 
 
 
@@ -49,11 +76,12 @@ def flatten_and_drop_nested_cols(df, nested_cols, other_cols):
 if __name__ == '__main__':
 
         df = get_spark_session().read.json(weather_data_part_1)
-        #df.printSchema()
-        df_dtype_cols = flights.dtypes
-        
+        df_dtype_cols = df.dtypes
         nested_cols, other_cols = retrieve_and_return_nested_cols(df_dtype_cols)
-        cleaned_df = flatten_and_drop_nested_cols(df, nested_cols)
-        cleaned_df.show()
-        #df.select('*', df[].alias('latitude'), df['coordinates.longitude'].alias('longitude'), df['date.local'].alias(('local'), df['date.utc'].alias('utc'))
-    
+        cleaned_df = flatten_and_drop_nested_cols(df, nested_cols, other_cols)
+        #cleaned_df.printSchema()
+        to_cast_cols = cleaned_df.columns[-2:]
+        #print(to_cast_cols)
+        casted_df = cast_col_to_timestamp(cleaned_df, to_cast_cols)
+        casted_df.printSchema()
+        write_to_snowflake(casted_df)
